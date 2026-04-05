@@ -76,7 +76,6 @@ export const Settings = () => {
     resolver: zodResolver(settingsSchema),
     defaultValues: mapSettingsToForm(settings),
   })
-
   const fontSize = useWatch({ control, name: 'fontSize' })
 
   const submitHandler = handleSubmit((values) => {
@@ -104,13 +103,13 @@ export const Settings = () => {
           color="inherit"
           sx={{ alignSelf: 'flex-start' }}
         >
-          На главную
+          На дашборд
         </Button>
 
         <Stack spacing={0.75}>
           <Typography variant="h4">Настройки</Typography>
           <Typography color="text.secondary">
-            Персонализируйте отображение заметок, уведомления и поведение редактора.
+            Персонализируйте дашборд, уведомления и общее поведение фитнес-трекера.
           </Typography>
         </Stack>
 
@@ -168,7 +167,7 @@ export const Settings = () => {
 
         <FormControl error={Boolean(errors.defaultView)}>
           <Typography variant="subtitle2" gutterBottom>
-            Вид заметок по умолчанию
+            Вид карточек по умолчанию
           </Typography>
           <Controller
             name="defaultView"
@@ -241,7 +240,7 @@ export const Settings = () => {
           render={({ field }) => (
             <FormControlLabel
               control={<Switch checked={field.value} onChange={(_, checked) => field.onChange(checked)} />}
-              label="Автосохранение заметок"
+              label="Автосохранение данных"
             />
           )}
         />

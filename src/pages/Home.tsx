@@ -1,108 +1,251 @@
-import AddRoundedIcon from '@mui/icons-material/AddRounded'
-import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
-import { Box, Container, Fab, IconButton, Stack, Tab, Tabs, Typography } from '@mui/material'
-import { useMemo, useState } from 'react'
-import { Link as RouterLink } from 'react-router-dom'
-import { CreateBlockDrawer } from '../components/CreateBlockDrawer'
+import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded'
+import BoltRoundedIcon from '@mui/icons-material/BoltRounded'
+import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded'
+import FitnessCenterRoundedIcon from '@mui/icons-material/FitnessCenterRounded'
+import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded'
+import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded'
+import {
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  LinearProgress,
+  Stack,
+  Typography,
+} from '@mui/material'
+import dayjs from 'dayjs'
+import { AppHeader } from '../components/AppHeader'
 import { EmptyState } from '../components/EmptyState'
-import { NoteBlockCard } from '../components/NoteBlockCard'
-import { ThemeToggle } from '../components/ThemeToggle'
-import { useNotesStore } from '../store/notes'
+import { StatCard } from '../components/StatCard'
+import { MUSCLE_GROUPS, useNotesStore } from '../store/notes'
 
-type HomeFilter = 'all' | 'categorized' | 'uncategorized'
+const getVolume = (sets: number, reps: number, weightKg: number) => sets * reps * weightKg
+const getOneRepMax = (weightKg: number, reps: number) => (reps <= 1 ? weightKg : weightKg * (1 + reps / 30))
 
 export const Home = () => {
-  const [filter, setFilter] = useState<HomeFilter>('all')
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const blocks = useNotesStore((state) => state.blocks)
-  const notes = useNotesStore((state) => state.notes)
-  const displayName = useNotesStore((state) => state.settings.displayName)
+  const settings = useNotesStore((state) => state.settings)
+  const logs = useNotesStore((state) => state.workoutLogs)
+  const templates = useNotesStore((state) => state.exerciseTemplates)
 
-  const filteredBlocks = useMemo(() => {
-    const sorted = [...blocks].sort((a, b) => {
-      if (a.pinned !== b.pinned) {
-        return Number(b.pinned) - Number(a.pinned)
-      }
+  const now = dayjs()
+  const weekStart = now.startOf('week')
+  const prevWeekStart = weekStart.subtract(1, 'week')
+  const currentWeekLogs = logs.filter(
+    (log) => dayjs(log.date).isAfter(weekStart) && log.status === 'completed',
+  )
+  const previousWeekLogs = logs.filter(
+    (log) =>
+      dayjs(log.date).isAfter(prevWeekStart) &&
+      dayjs(log.date).isBefore(weekStart) &&
+      log.status === 'completed',
+  )
 
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  const weeklyVolume = currentWeekLogs
+    .flatMap((log) => log.exercises)
+    .reduce((sum, exercise) => sum + getVolume(exercise.sets, exercise.reps, exercise.weightKg), 0)
+  const previousWeeklyVolume = previousWeekLogs
+    .flatMap((log) => log.exercises)
+    .reduce((sum, exercise) => sum + getVolume(exercise.sets, exercise.reps, exercise.weightKg), 0)
+
+  const benchHistory = logs
+    .flatMap((log) => log.exercises.map((exercise) => ({ ...exercise, date: log.date })))
+    .filter((exercise) => exercise.templateId === 'bench-press' && exercise.weightKg > 0)
+    .sort((a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf())
+  const benchStart = benchHistory[0]
+  const benchLatest = benchHistory[benchHistory.length - 1]
+  const benchGrowthPercent =
+    benchStart && benchLatest ? ((benchLatest.weightKg - benchStart.weightKg) / benchStart.weightKg) * 100 : 0
+
+  const prs = templates
+    .map((template) => {
+      const best = logs
+        .flatMap((log) => log.exercises)
+        .filter((exercise) => exercise.templateId === template.id)
+        .reduce(
+          (max, exercise) => Math.max(max, getOneRepMax(exercise.weightKg, exercise.reps)),
+          0,
+        )
+
+      return { name: template.name, value: best }
     })
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 3)
 
-    if (filter === 'categorized') {
-      return sorted.filter((block) => block.category !== 'Без категории')
-    }
+  const bestPr = prs[0]
+  const streakDates = logs
+    .filter((log) => log.status === 'completed')
+    .map((log) => dayjs(log.date).startOf('day').format('YYYY-MM-DD'))
+  const streakSet = new Set(streakDates)
+  let streak = 0
+  let cursor = now.startOf('day')
+  while (streakSet.has(cursor.format('YYYY-MM-DD'))) {
+    streak += 1
+    cursor = cursor.subtract(1, 'day')
+  }
 
-    if (filter === 'uncategorized') {
-      return sorted.filter((block) => block.category === 'Без категории')
-    }
-
-    return sorted
-  }, [blocks, filter])
+  const muscleCounts = MUSCLE_GROUPS.map((group) => ({
+    group,
+    count: currentWeekLogs.filter((log) => log.muscleGroups.includes(group)).length,
+  }))
+  const maxMuscleCount = Math.max(...muscleCounts.map((item) => item.count), 1)
+  const weekDelta = weeklyVolume - previousWeeklyVolume
 
   return (
-    <>
-      <Container maxWidth="md" sx={{ py: { xs: 3, sm: 5 }, pb: 12 }}>
-        <Stack spacing={3}>
-          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-            <Stack spacing={1}>
-              <Typography variant="h3">Заметки</Typography>
-              <Typography color="text.secondary">
-                {displayName
-                  ? `${displayName}, все важное в одном месте.`
-                  : 'Соберите блоки и заметки в одном приложении.'}
-              </Typography>
-            </Stack>
+    <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 5 }, pb: 10 }}>
+      <Stack spacing={3}>
+        <AppHeader
+          title="Workout Dashboard"
+          subtitle={`${settings.displayName}, вот как выглядит ваша неделя по объёму, прогрессу силы и качеству плана.`}
+        />
 
-            <Stack direction="row" spacing={0.5}>
-              <IconButton component={RouterLink} to="/settings" color="inherit" aria-label="Настройки">
-                <SettingsRoundedIcon />
-              </IconButton>
-              <ThemeToggle />
-            </Stack>
-          </Stack>
-
-          <Tabs value={filter} onChange={(_, value: HomeFilter) => setFilter(value)} variant="scrollable">
-            <Tab value="all" label="Все" />
-            <Tab value="categorized" label="Заметки" />
-            <Tab value="uncategorized" label="Без категории" />
-          </Tabs>
-
-          {filteredBlocks.length ? (
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-                gap: 2,
-              }}
-            >
-              {filteredBlocks.map((block) => (
-                <NoteBlockCard
-                  key={block.id}
-                  block={block}
-                  notes={notes.filter((note) => note.blockId === block.id)}
-                />
-              ))}
-            </Box>
-          ) : (
-            <EmptyState
-              title="Подходящих блоков пока нет"
-              description="Создайте первый блок и разложите заметки по темам, чтобы рабочий стол выглядел живым и полезным."
-              actionLabel="Создать блок"
-              onAction={() => setDrawerOpen(true)}
-            />
-          )}
+        <Stack
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
+            gap: 2,
+          }}
+        >
+          <StatCard
+            label="Тренировок за неделю"
+            value={String(currentWeekLogs.length)}
+            caption="Считаются только выполненные сессии"
+            icon={<FitnessCenterRoundedIcon color="primary" />}
+          />
+          <StatCard
+            label="Общий тоннаж"
+            value={`${weeklyVolume.toLocaleString('ru-RU')} кг`}
+            caption="Сумма подходов × повторений × веса"
+            icon={<BarChartRoundedIcon color="primary" />}
+          />
+          <StatCard
+            label="Лучший PR"
+            value={bestPr ? `${bestPr.value.toFixed(0)} кг` : 'Нет данных'}
+            caption={bestPr ? bestPr.name : 'Появится после логов'}
+            icon={<EmojiEventsRoundedIcon color="primary" />}
+          />
+          <StatCard
+            label="Текущий стрик"
+            value={`${streak} дн.`}
+            caption="Подряд выполненные тренировочные дни"
+            icon={<BoltRoundedIcon color="primary" />}
+          />
         </Stack>
-      </Container>
 
-      <Fab
-        color="primary"
-        aria-label="Создать блок"
-        onClick={() => setDrawerOpen(true)}
-        sx={{ position: 'fixed', right: 24, bottom: 24 }}
-      >
-        <AddRoundedIcon />
-      </Fab>
+        <Stack
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: '1.35fr 1fr' },
+            gap: 2,
+          }}
+        >
+          <Card>
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="h6">Прогрессия весов и сила</Typography>
+                  <TrendingUpRoundedIcon color="primary" />
+                </Stack>
+                {benchHistory.length ? (
+                  <>
+                    <Typography color="text.secondary">
+                      На жиме лёжа вы стали сильнее на {benchGrowthPercent.toFixed(1)}% по рабочему весу.
+                    </Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                      {benchHistory.map((entry, index) => (
+                        <Chip
+                          key={`${entry.date}-${index}`}
+                          label={`${dayjs(entry.date).format('DD.MM')} · ${entry.weightKg} кг`}
+                          color={index === benchHistory.length - 1 ? 'primary' : 'default'}
+                        />
+                      ))}
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      Расчёт роста силы строится по динамике рабочего веса в журнале и дополняется оценкой 1RM.
+                    </Typography>
+                  </>
+                ) : (
+                  <EmptyState
+                    title="Недостаточно данных для графика"
+                    description="Как только появятся несколько логов по одному упражнению, здесь отобразится рост силы."
+                  />
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
 
-      <CreateBlockDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-    </>
+          <Card>
+            <CardContent>
+              <Stack spacing={2}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="h6">Сравнение недель</Typography>
+                  <InsightsRoundedIcon color="primary" />
+                </Stack>
+                <Typography variant="h4">
+                  {weekDelta >= 0 ? '+' : ''}
+                  {weekDelta.toLocaleString('ru-RU')} кг
+                </Typography>
+                <Typography color="text.secondary">
+                  По сравнению с прошлой неделей вы {weekDelta >= 0 ? 'увеличили' : 'снизили'} объём на{' '}
+                  {Math.abs(weekDelta).toLocaleString('ru-RU')} кг.
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Прошлая неделя: {previousWeeklyVolume.toLocaleString('ru-RU')} кг
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Stack>
+
+        <Stack
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
+            gap: 2,
+          }}
+        >
+          <Card>
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography variant="h6">Личные рекорды и 1RM</Typography>
+                {prs.length ? (
+                  prs.map((pr) => (
+                    <Stack key={pr.name} direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography>{pr.name}</Typography>
+                      <Chip label={`1RM ${pr.value.toFixed(0)} кг`} color="primary" />
+                    </Stack>
+                  ))
+                ) : (
+                  <Typography color="text.secondary">Личные рекорды появятся после первых заполненных тренировок.</Typography>
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography variant="h6">Мышечная карта недели</Typography>
+                {muscleCounts.map((item) => (
+                  <Stack key={item.group} spacing={0.75}>
+                    <Stack direction="row" justifyContent="space-between">
+                      <Typography variant="body2">{item.group}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {item.count} сесс.
+                      </Typography>
+                    </Stack>
+                    <LinearProgress
+                      variant="determinate"
+                      value={(item.count / maxMuscleCount) * 100}
+                      sx={{ height: 8, borderRadius: 999 }}
+                    />
+                  </Stack>
+                ))}
+              </Stack>
+            </CardContent>
+          </Card>
+        </Stack>
+      </Stack>
+    </Container>
   )
 }

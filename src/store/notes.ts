@@ -3,36 +3,19 @@ import type { PaletteMode } from '@mui/material'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type BlockCategory = 'Личное' | 'Работа' | 'Учёба' | 'Без категории'
-export type NotePriority = 'Обычная' | 'Важная' | 'Срочная'
-export type NoteTag = 'Идея' | 'Задача' | 'Напоминание' | 'Черновик'
+export type MuscleGroup =
+  | 'Грудь'
+  | 'Спина'
+  | 'Ноги'
+  | 'Плечи'
+  | 'Руки'
+  | 'Пресс'
+  | 'Кардио'
+
+export type EquipmentType = 'Штанга' | 'Гантели' | 'Тренажёр' | 'Собственный вес'
+export type WorkoutStatus = 'planned' | 'completed' | 'missed'
 export type NoteView = 'list' | 'grid'
 export type NotificationChannel = 'Push' | 'Email' | 'SMS'
-
-export interface NoteBlock {
-  id: string
-  title: string
-  category: BlockCategory
-  pinned: boolean
-  visibleEverywhere: boolean
-  createdAt: string
-  updatedAt: string
-}
-
-export interface NoteItemRecord {
-  id: string
-  blockId: string
-  title: string
-  content: string
-  datetime: string
-  createdAt: string
-  updatedAt: string
-  priority: NotePriority
-  tags: NoteTag[]
-  importance: number
-  remind: boolean
-  completed: boolean
-}
 
 export interface AppSettings {
   displayName: string
@@ -46,131 +29,255 @@ export interface AppSettings {
   privacyAccepted: boolean
 }
 
-interface CreateBlockInput {
+export interface ExerciseTemplate {
+  id: string
+  name: string
+  muscleGroup: MuscleGroup
+  equipment: EquipmentType
+}
+
+export interface ExercisePrescription {
+  id: string
+  templateId: string
+  sets: number
+  reps: number
+  weightKg: number
+  restSec: number
+}
+
+export interface ProgramDay {
+  id: string
+  weekday: number
   title: string
-  category: BlockCategory
+  focus: MuscleGroup[]
+  exerciseIds: string[]
+}
+
+export interface WorkoutProgram {
+  id: string
+  name: string
+  goal: string
+  durationWeeks: number
   pinned: boolean
-  visibleEverywhere: boolean
+  createdAt: string
+  updatedAt: string
+  days: ProgramDay[]
 }
 
-interface CreateNoteInput {
-  blockId: string
+export interface WorkoutLogExercise {
+  templateId: string
+  weightKg: number
+  reps: number
+  sets: number
+}
+
+export interface WorkoutLog {
+  id: string
+  date: string
+  programId: string
+  programDayId: string
   title: string
-  content: string
-  datetime: string
-  priority: NotePriority
-  tags: NoteTag[]
-  importance: number
-  remind: boolean
-  completed: boolean
+  status: WorkoutStatus
+  muscleGroups: MuscleGroup[]
+  exercises: WorkoutLogExercise[]
 }
 
-interface UpdateNoteInput {
-  title?: string
-  content?: string
-  datetime?: string
-  priority?: NotePriority
-  tags?: NoteTag[]
-  importance?: number
-  remind?: boolean
-  completed?: boolean
+interface CreateProgramInput {
+  name: string
+  goal: string
+  durationWeeks: number
+  pinned: boolean
+  days: Array<{
+    weekday: number
+    title: string
+    focus: MuscleGroup[]
+    exerciseIds: string[]
+  }>
 }
 
-interface NotesState {
-  blocks: NoteBlock[]
-  notes: NoteItemRecord[]
+interface CreateExerciseInput {
+  name: string
+  muscleGroup: MuscleGroup
+  equipment: EquipmentType
+  sets: number
+  reps: number
+  weightKg: number
+  restSec: number
+}
+
+interface FitnessState {
   settings: AppSettings
-  createBlock: (payload: CreateBlockInput) => string
-  createNote: (payload: CreateNoteInput) => string
-  updateNote: (noteId: string, payload: UpdateNoteInput) => void
+  exerciseTemplates: ExerciseTemplate[]
+  prescriptions: ExercisePrescription[]
+  programs: WorkoutProgram[]
+  workoutLogs: WorkoutLog[]
+  createProgram: (payload: CreateProgramInput) => string
+  createExerciseTemplate: (payload: CreateExerciseInput) => string
   saveSettings: (payload: AppSettings) => void
   setThemeMode: (mode: PaletteMode) => void
 }
 
-export const BLOCK_CATEGORIES: BlockCategory[] = ['Личное', 'Работа', 'Учёба', 'Без категории']
-export const NOTE_PRIORITIES: NotePriority[] = ['Обычная', 'Важная', 'Срочная']
-export const NOTE_TAGS: NoteTag[] = ['Идея', 'Задача', 'Напоминание', 'Черновик']
+export const MUSCLE_GROUPS: MuscleGroup[] = [
+  'Грудь',
+  'Спина',
+  'Ноги',
+  'Плечи',
+  'Руки',
+  'Пресс',
+  'Кардио',
+]
+export const EQUIPMENT_TYPES: EquipmentType[] = ['Штанга', 'Гантели', 'Тренажёр', 'Собственный вес']
 export const NOTIFICATION_CHANNELS: NotificationChannel[] = ['Push', 'Email', 'SMS']
+export const WEEKDAY_OPTIONS = [
+  { value: 1, label: 'Понедельник' },
+  { value: 2, label: 'Вторник' },
+  { value: 3, label: 'Среда' },
+  { value: 4, label: 'Четверг' },
+  { value: 5, label: 'Пятница' },
+  { value: 6, label: 'Суббота' },
+  { value: 0, label: 'Воскресенье' },
+] as const
 
 const now = dayjs()
-const journalBlockId = 'block-journal'
-const workBlockId = 'block-work'
-const uncategorizedBlockId = 'block-uncategorized'
 
-const initialBlocks: NoteBlock[] = [
+const exerciseTemplates: ExerciseTemplate[] = [
+  { id: 'bench-press', name: 'Жим лёжа', muscleGroup: 'Грудь', equipment: 'Штанга' },
+  { id: 'barbell-row', name: 'Тяга штанги в наклоне', muscleGroup: 'Спина', equipment: 'Штанга' },
+  { id: 'squat', name: 'Приседания', muscleGroup: 'Ноги', equipment: 'Штанга' },
+  { id: 'shoulder-press', name: 'Жим гантелей сидя', muscleGroup: 'Плечи', equipment: 'Гантели' },
+  { id: 'pull-up', name: 'Подтягивания', muscleGroup: 'Спина', equipment: 'Собственный вес' },
+  { id: 'plank', name: 'Планка', muscleGroup: 'Пресс', equipment: 'Собственный вес' },
+]
+
+const prescriptions: ExercisePrescription[] = [
+  { id: 'pres-1', templateId: 'bench-press', sets: 4, reps: 8, weightKg: 80, restSec: 90 },
+  { id: 'pres-2', templateId: 'shoulder-press', sets: 3, reps: 10, weightKg: 22, restSec: 75 },
+  { id: 'pres-3', templateId: 'barbell-row', sets: 4, reps: 8, weightKg: 70, restSec: 90 },
+  { id: 'pres-4', templateId: 'pull-up', sets: 4, reps: 10, weightKg: 0, restSec: 60 },
+  { id: 'pres-5', templateId: 'squat', sets: 5, reps: 5, weightKg: 110, restSec: 120 },
+  { id: 'pres-6', templateId: 'plank', sets: 3, reps: 1, weightKg: 0, restSec: 45 },
+]
+
+const programs: WorkoutProgram[] = [
   {
-    id: journalBlockId,
-    title: 'Личный журнал',
-    category: 'Личное',
+    id: 'strength-split',
+    name: 'Силовой сплит',
+    goal: 'Рост силы в базовых упражнениях и стабильный тоннаж по неделе.',
+    durationWeeks: 8,
     pinned: true,
-    visibleEverywhere: true,
-    createdAt: now.subtract(12, 'day').toISOString(),
-    updatedAt: now.subtract(1, 'hour').toISOString(),
-  },
-  {
-    id: workBlockId,
-    title: 'Продуктовые идеи',
-    category: 'Работа',
-    pinned: false,
-    visibleEverywhere: true,
-    createdAt: now.subtract(7, 'day').toISOString(),
-    updatedAt: now.subtract(4, 'hour').toISOString(),
-  },
-  {
-    id: uncategorizedBlockId,
-    title: 'Быстрые мысли',
-    category: 'Без категории',
-    pinned: false,
-    visibleEverywhere: true,
-    createdAt: now.subtract(2, 'day').toISOString(),
-    updatedAt: now.subtract(8, 'hour').toISOString(),
+    createdAt: now.subtract(8, 'week').toISOString(),
+    updatedAt: now.subtract(1, 'day').toISOString(),
+    days: [
+      {
+        id: 'strength-mon',
+        weekday: 1,
+        title: 'Понедельник — грудь и плечи',
+        focus: ['Грудь', 'Плечи'],
+        exerciseIds: ['pres-1', 'pres-2'],
+      },
+      {
+        id: 'strength-wed',
+        weekday: 3,
+        title: 'Среда — спина',
+        focus: ['Спина', 'Руки'],
+        exerciseIds: ['pres-3', 'pres-4'],
+      },
+      {
+        id: 'strength-fri',
+        weekday: 5,
+        title: 'Пятница — ноги',
+        focus: ['Ноги', 'Пресс'],
+        exerciseIds: ['pres-5', 'pres-6'],
+      },
+    ],
   },
 ]
 
-const initialNotes: NoteItemRecord[] = [
+const workoutLogs: WorkoutLog[] = [
   {
-    id: 'note-journal-1',
-    blockId: journalBlockId,
-    title: 'Маршрут на апрель',
-    content:
-      'Собрать короткий список мест, куда хочется выбраться на длинных выходных, и сохранить ссылки на билеты.',
-    datetime: now.subtract(2, 'hour').toISOString(),
-    createdAt: now.subtract(2, 'hour').toISOString(),
-    updatedAt: now.subtract(1, 'hour').toISOString(),
-    priority: 'Важная',
-    tags: ['Идея', 'Напоминание'],
-    importance: 7,
-    remind: true,
-    completed: false,
+    id: 'log-1',
+    date: now.subtract(13, 'day').toISOString(),
+    programId: 'strength-split',
+    programDayId: 'strength-mon',
+    title: 'Понедельник — грудь и плечи',
+    status: 'completed',
+    muscleGroups: ['Грудь', 'Плечи'],
+    exercises: [
+      { templateId: 'bench-press', sets: 4, reps: 8, weightKg: 75 },
+      { templateId: 'shoulder-press', sets: 3, reps: 10, weightKg: 20 },
+    ],
   },
   {
-    id: 'note-work-1',
-    blockId: workBlockId,
-    title: 'Новый онбординг',
-    content:
-      'Подумать над сценарием первого запуска: короткий тур, шаблоны заметок и мягкое предложение включить синхронизацию.',
-    datetime: now.subtract(1, 'day').toISOString(),
-    createdAt: now.subtract(1, 'day').toISOString(),
-    updatedAt: now.subtract(4, 'hour').toISOString(),
-    priority: 'Срочная',
-    tags: ['Задача', 'Черновик'],
-    importance: 9,
-    remind: true,
-    completed: false,
+    id: 'log-2',
+    date: now.subtract(11, 'day').toISOString(),
+    programId: 'strength-split',
+    programDayId: 'strength-wed',
+    title: 'Среда — спина',
+    status: 'completed',
+    muscleGroups: ['Спина', 'Руки'],
+    exercises: [
+      { templateId: 'barbell-row', sets: 4, reps: 8, weightKg: 65 },
+      { templateId: 'pull-up', sets: 4, reps: 10, weightKg: 0 },
+    ],
   },
   {
-    id: 'note-quick-1',
-    blockId: uncategorizedBlockId,
-    title: 'Подарок на май',
-    content: 'Сравнить три варианта и записать, что нравится в каждом, пока идея не вылетела из головы.',
-    datetime: now.subtract(3, 'day').toISOString(),
-    createdAt: now.subtract(3, 'day').toISOString(),
-    updatedAt: now.subtract(8, 'hour').toISOString(),
-    priority: 'Обычная',
-    tags: ['Идея'],
-    importance: 5,
-    remind: false,
-    completed: false,
+    id: 'log-3',
+    date: now.subtract(9, 'day').toISOString(),
+    programId: 'strength-split',
+    programDayId: 'strength-fri',
+    title: 'Пятница — ноги',
+    status: 'completed',
+    muscleGroups: ['Ноги', 'Пресс'],
+    exercises: [
+      { templateId: 'squat', sets: 5, reps: 5, weightKg: 105 },
+      { templateId: 'plank', sets: 3, reps: 1, weightKg: 0 },
+    ],
+  },
+  {
+    id: 'log-4',
+    date: now.subtract(6, 'day').toISOString(),
+    programId: 'strength-split',
+    programDayId: 'strength-mon',
+    title: 'Понедельник — грудь и плечи',
+    status: 'completed',
+    muscleGroups: ['Грудь', 'Плечи'],
+    exercises: [
+      { templateId: 'bench-press', sets: 4, reps: 8, weightKg: 80 },
+      { templateId: 'shoulder-press', sets: 3, reps: 10, weightKg: 22 },
+    ],
+  },
+  {
+    id: 'log-5',
+    date: now.subtract(4, 'day').toISOString(),
+    programId: 'strength-split',
+    programDayId: 'strength-wed',
+    title: 'Среда — спина',
+    status: 'missed',
+    muscleGroups: ['Спина', 'Руки'],
+    exercises: [],
+  },
+  {
+    id: 'log-6',
+    date: now.subtract(2, 'day').toISOString(),
+    programId: 'strength-split',
+    programDayId: 'strength-fri',
+    title: 'Пятница — ноги',
+    status: 'completed',
+    muscleGroups: ['Ноги', 'Пресс'],
+    exercises: [
+      { templateId: 'squat', sets: 5, reps: 5, weightKg: 110 },
+      { templateId: 'plank', sets: 3, reps: 1, weightKg: 0 },
+    ],
+  },
+  {
+    id: 'log-7',
+    date: now.toISOString(),
+    programId: 'strength-split',
+    programDayId: 'strength-mon',
+    title: 'Сегодня — грудь и плечи',
+    status: 'planned',
+    muscleGroups: ['Грудь', 'Плечи'],
+    exercises: [],
   },
 ]
 
@@ -186,103 +293,82 @@ const initialSettings: AppSettings = {
   privacyAccepted: true,
 }
 
-const updateBlockTimestamp = (blocks: NoteBlock[], blockId: string, updatedAt: string) =>
-  blocks.map((block) => (block.id === blockId ? { ...block, updatedAt } : block))
-
-export const useNotesStore = create<NotesState>()(
+export const useNotesStore = create<FitnessState>()(
   persist(
     (set) => ({
-      blocks: initialBlocks,
-      notes: initialNotes,
       settings: initialSettings,
-      createBlock: (payload) => {
+      exerciseTemplates,
+      prescriptions,
+      programs,
+      workoutLogs,
+      createProgram: (payload) => {
         const id = crypto.randomUUID()
         const timestamp = new Date().toISOString()
 
         set((state) => ({
-          blocks: [
+          programs: [
             {
               id,
-              title: payload.title,
-              category: payload.category,
+              name: payload.name,
+              goal: payload.goal,
+              durationWeeks: payload.durationWeeks,
               pinned: payload.pinned,
-              visibleEverywhere: payload.visibleEverywhere,
               createdAt: timestamp,
               updatedAt: timestamp,
+              days: payload.days.map((day) => ({
+                id: crypto.randomUUID(),
+                weekday: day.weekday,
+                title: day.title,
+                focus: day.focus,
+                exerciseIds: day.exerciseIds,
+              })),
             },
-            ...state.blocks,
+            ...state.programs,
           ],
         }))
 
         return id
       },
-      createNote: (payload) => {
-        const id = crypto.randomUUID()
-        const timestamp = new Date().toISOString()
+      createExerciseTemplate: (payload) => {
+        const templateId = crypto.randomUUID()
+        const prescriptionId = crypto.randomUUID()
 
         set((state) => ({
-          notes: [
+          exerciseTemplates: [
             {
-              id,
-              blockId: payload.blockId,
-              title: payload.title,
-              content: payload.content,
-              datetime: payload.datetime,
-              createdAt: timestamp,
-              updatedAt: timestamp,
-              priority: payload.priority,
-              tags: payload.tags,
-              importance: payload.importance,
-              remind: payload.remind,
-              completed: payload.completed,
+              id: templateId,
+              name: payload.name,
+              muscleGroup: payload.muscleGroup,
+              equipment: payload.equipment,
             },
-            ...state.notes,
+            ...state.exerciseTemplates,
           ],
-          blocks: updateBlockTimestamp(state.blocks, payload.blockId, timestamp),
+          prescriptions: [
+            {
+              id: prescriptionId,
+              templateId,
+              sets: payload.sets,
+              reps: payload.reps,
+              weightKg: payload.weightKg,
+              restSec: payload.restSec,
+            },
+            ...state.prescriptions,
+          ],
         }))
 
-        return id
+        return templateId
       },
-      updateNote: (noteId, payload) => {
-        const timestamp = new Date().toISOString()
-
-        set((state) => {
-          const currentNote = state.notes.find((note) => note.id === noteId)
-
-          if (!currentNote) {
-            return state
-          }
-
-          return {
-            notes: state.notes.map((note) =>
-              note.id === noteId
-                ? {
-                    ...note,
-                    ...payload,
-                    updatedAt: timestamp,
-                  }
-                : note,
-            ),
-            blocks: updateBlockTimestamp(state.blocks, currentNote.blockId, timestamp),
-          }
-        })
-      },
-      saveSettings: (payload) => {
-        set(() => ({
-          settings: payload,
-        }))
-      },
-      setThemeMode: (mode) => {
+      saveSettings: (payload) => set(() => ({ settings: payload })),
+      setThemeMode: (mode) =>
         set((state) => ({
           settings: {
             ...state.settings,
             themeMode: mode,
           },
-        }))
-      },
+        })),
     }),
     {
-      name: 'notes-app-store',
+      name: 'fitness-tracker-store',
     },
   ),
 )
