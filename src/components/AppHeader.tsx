@@ -1,5 +1,6 @@
 import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded'
-import FitnessCenterRoundedIcon from '@mui/icons-material/FitnessCenterRounded'
+import EditNoteRoundedIcon from '@mui/icons-material/EditNoteRounded'
+import SportsMmaRoundedIcon from '@mui/icons-material/SportsMmaRounded'
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded'
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded'
 import { IconButton, Stack, Typography } from '@mui/material'
@@ -12,8 +13,9 @@ interface AppHeaderProps {
 }
 
 const navItems = [
-  { to: '/', label: 'Дашборд', icon: <HomeRoundedIcon /> },
-  { to: '/planner', label: 'Планы', icon: <FitnessCenterRoundedIcon /> },
+  { to: '/', label: 'kiks', icon: <HomeRoundedIcon /> },
+  { to: '/notes', label: 'Заметки', icon: <EditNoteRoundedIcon /> },
+  { to: '/planner', label: 'Циклы', icon: <SportsMmaRoundedIcon /> },
   { to: '/calendar', label: 'Календарь', icon: <CalendarMonthRoundedIcon /> },
 ]
 

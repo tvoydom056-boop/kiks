@@ -12,6 +12,7 @@ import {
   Stack,
   TextField,
 } from '@mui/material'
+import { useEffect } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import {
@@ -19,6 +20,8 @@ import {
   MUSCLE_GROUPS,
   useNotesStore,
   type EquipmentType,
+  type ExerciseTemplate,
+  type ExercisePrescription,
   type MuscleGroup,
 } from '../store/notes'
 
@@ -28,29 +31,41 @@ const schema = z.object({
   equipment: z.custom<EquipmentType>((value) => EQUIPMENT_TYPES.includes(value as EquipmentType)),
   sets: z.number().min(1).max(10),
   reps: z.number().min(1).max(30),
-  weightKg: z.number().min(0).max(400),
+  weightKg: z.number().min(0).max(200),
   restSec: z.number().min(15).max(300),
 })
 
 type FormValues = z.infer<typeof schema>
 
-const defaultValues: FormValues = {
-  name: '',
-  muscleGroup: 'Грудь',
-  equipment: 'Штанга',
-  sets: 4,
-  reps: 8,
-  weightKg: 60,
-  restSec: 90,
-}
-
 interface CreateExerciseDialogProps {
   open: boolean
   onClose: () => void
+  initialTemplate?: ExerciseTemplate | null
+  initialPrescription?: ExercisePrescription | null
 }
 
-export const CreateExerciseDialog = ({ open, onClose }: CreateExerciseDialogProps) => {
+const getDefaultValues = (
+  template?: ExerciseTemplate | null,
+  prescription?: ExercisePrescription | null,
+): FormValues => ({
+  name: template?.name ?? '',
+  muscleGroup: template?.muscleGroup ?? 'Кисть',
+  equipment: template?.equipment ?? 'Ремень',
+  sets: prescription?.sets ?? 4,
+  reps: prescription?.reps ?? 6,
+  weightKg: prescription?.weightKg ?? 20,
+  restSec: prescription?.restSec ?? 90,
+})
+
+export const CreateExerciseDialog = ({
+  open,
+  onClose,
+  initialTemplate = null,
+  initialPrescription = null,
+}: CreateExerciseDialogProps) => {
   const createExerciseTemplate = useNotesStore((state) => state.createExerciseTemplate)
+  const updateExerciseTemplate = useNotesStore((state) => state.updateExerciseTemplate)
+  const isEditMode = Boolean(initialTemplate)
   const {
     control,
     handleSubmit,
@@ -58,35 +73,44 @@ export const CreateExerciseDialog = ({ open, onClose }: CreateExerciseDialogProp
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues,
+    defaultValues: getDefaultValues(initialTemplate, initialPrescription),
   })
 
+  useEffect(() => {
+    reset(getDefaultValues(initialTemplate, initialPrescription))
+  }, [initialPrescription, initialTemplate, reset])
+
   const submitHandler = handleSubmit((values) => {
-    createExerciseTemplate(values)
-    reset(defaultValues)
+    if (initialTemplate) {
+      updateExerciseTemplate(initialTemplate.id, values)
+    } else {
+      createExerciseTemplate(values)
+    }
+
+    reset(getDefaultValues())
     onClose()
   })
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Новое упражнение</DialogTitle>
+      <DialogTitle>{isEditMode ? 'Редактировать движение' : 'Новое движение'}</DialogTitle>
       <DialogContent>
         <Stack component="form" spacing={2.5} onSubmit={submitHandler} sx={{ pt: 1 }}>
           <Controller
             name="name"
             control={control}
             render={({ field }) => (
-              <TextField {...field} label="Название упражнения" error={Boolean(errors.name)} helperText={errors.name?.message} />
+              <TextField {...field} label="Название движения" error={Boolean(errors.name)} helperText={errors.name?.message} />
             )}
           />
 
           <FormControl error={Boolean(errors.muscleGroup)}>
-            <InputLabel id="muscle-group-label">Группа мышц</InputLabel>
+            <InputLabel id="muscle-group-label">Зона акцента</InputLabel>
             <Controller
               name="muscleGroup"
               control={control}
               render={({ field }) => (
-                <Select {...field} labelId="muscle-group-label" label="Группа мышц">
+                <Select {...field} labelId="muscle-group-label" label="Зона акцента">
                   {MUSCLE_GROUPS.map((item) => (
                     <MenuItem key={item} value={item}>
                       {item}
@@ -99,12 +123,12 @@ export const CreateExerciseDialog = ({ open, onClose }: CreateExerciseDialogProp
           </FormControl>
 
           <FormControl error={Boolean(errors.equipment)}>
-            <InputLabel id="equipment-label">Тип</InputLabel>
+            <InputLabel id="equipment-label">Инвентарь</InputLabel>
             <Controller
               name="equipment"
               control={control}
               render={({ field }) => (
-                <Select {...field} labelId="equipment-label" label="Тип">
+                <Select {...field} labelId="equipment-label" label="Инвентарь">
                   {EQUIPMENT_TYPES.map((item) => (
                     <MenuItem key={item} value={item}>
                       {item}
@@ -134,7 +158,7 @@ export const CreateExerciseDialog = ({ open, onClose }: CreateExerciseDialogProp
               control={control}
               render={({ field }) => (
                 <TextField
-                  label="Повторения"
+                  label="Повторы"
                   type="number"
                   value={field.value}
                   onChange={(event) => field.onChange(Number(event.target.value))}
@@ -149,7 +173,7 @@ export const CreateExerciseDialog = ({ open, onClose }: CreateExerciseDialogProp
               control={control}
               render={({ field }) => (
                 <TextField
-                  label="Вес, кг"
+                  label="Нагрузка, кг"
                   type="number"
                   value={field.value}
                   onChange={(event) => field.onChange(Number(event.target.value))}
@@ -175,7 +199,7 @@ export const CreateExerciseDialog = ({ open, onClose }: CreateExerciseDialogProp
               Отмена
             </Button>
             <Button type="submit" variant="contained" disabled={isSubmitting}>
-              Сохранить упражнение
+              {isEditMode ? 'Сохранить изменения' : 'Сохранить движение'}
             </Button>
           </Stack>
         </Stack>

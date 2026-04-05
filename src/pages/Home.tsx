@@ -1,8 +1,8 @@
 import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded'
 import BoltRoundedIcon from '@mui/icons-material/BoltRounded'
 import EmojiEventsRoundedIcon from '@mui/icons-material/EmojiEventsRounded'
-import FitnessCenterRoundedIcon from '@mui/icons-material/FitnessCenterRounded'
 import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded'
+import SportsMmaRoundedIcon from '@mui/icons-material/SportsMmaRounded'
 import TrendingUpRoundedIcon from '@mui/icons-material/TrendingUpRounded'
 import {
   Card,
@@ -19,13 +19,12 @@ import { EmptyState } from '../components/EmptyState'
 import { StatCard } from '../components/StatCard'
 import { MUSCLE_GROUPS, useNotesStore } from '../store/notes'
 
-const getVolume = (sets: number, reps: number, weightKg: number) => sets * reps * weightKg
-const getOneRepMax = (weightKg: number, reps: number) => (reps <= 1 ? weightKg : weightKg * (1 + reps / 30))
+const getLoadVolume = (sets: number, reps: number, weightKg: number) => sets * reps * weightKg
 
 export const Home = () => {
   const settings = useNotesStore((state) => state.settings)
   const logs = useNotesStore((state) => state.workoutLogs)
-  const templates = useNotesStore((state) => state.exerciseTemplates)
+  const programs = useNotesStore((state) => state.programs)
 
   const now = dayjs()
   const weekStart = now.startOf('week')
@@ -40,39 +39,38 @@ export const Home = () => {
       log.status === 'completed',
   )
 
-  const weeklyVolume = currentWeekLogs
-    .flatMap((log) => log.exercises)
-    .reduce((sum, exercise) => sum + getVolume(exercise.sets, exercise.reps, exercise.weightKg), 0)
-  const previousWeeklyVolume = previousWeekLogs
-    .flatMap((log) => log.exercises)
-    .reduce((sum, exercise) => sum + getVolume(exercise.sets, exercise.reps, exercise.weightKg), 0)
+  const currentWeekDays = programs.flatMap((program) => program.days)
+  const currentWeekPlans = currentWeekLogs
+    .map((log) => currentWeekDays.find((day) => day.id === log.programDayId))
+    .filter((day): day is (typeof currentWeekDays)[number] => Boolean(day))
 
-  const benchHistory = logs
+  const totalLoad = currentWeekLogs
+    .flatMap((log) => log.exercises)
+    .reduce((sum, exercise) => sum + getLoadVolume(exercise.sets, exercise.reps, exercise.weightKg), 0)
+  const previousTotalLoad = previousWeekLogs
+    .flatMap((log) => log.exercises)
+    .reduce((sum, exercise) => sum + getLoadVolume(exercise.sets, exercise.reps, exercise.weightKg), 0)
+  const tableSessions = currentWeekLogs.filter((log) => log.exercises.some((exercise) => exercise.templateId === 'table-toproll')).length
+  const totalDrills = currentWeekPlans.reduce((sum, day) => sum + day.trainingPlan.drillMoments.length, 0)
+
+  const pronationHistory = logs
     .flatMap((log) => log.exercises.map((exercise) => ({ ...exercise, date: log.date })))
-    .filter((exercise) => exercise.templateId === 'bench-press' && exercise.weightKg > 0)
+    .filter((exercise) => exercise.templateId === 'pronation-rise' && exercise.weightKg > 0)
     .sort((a, b) => dayjs(a.date).valueOf() - dayjs(b.date).valueOf())
-  const benchStart = benchHistory[0]
-  const benchLatest = benchHistory[benchHistory.length - 1]
-  const benchGrowthPercent =
-    benchStart && benchLatest ? ((benchLatest.weightKg - benchStart.weightKg) / benchStart.weightKg) * 100 : 0
+  const pronationStart = pronationHistory[0]
+  const pronationLatest = pronationHistory[pronationHistory.length - 1]
+  const pronationGrowthPercent =
+    pronationStart && pronationLatest
+      ? ((pronationLatest.weightKg - pronationStart.weightKg) / pronationStart.weightKg) * 100
+      : 0
 
-  const prs = templates
-    .map((template) => {
-      const best = logs
-        .flatMap((log) => log.exercises)
-        .filter((exercise) => exercise.templateId === template.id)
-        .reduce(
-          (max, exercise) => Math.max(max, getOneRepMax(exercise.weightKg, exercise.reps)),
-          0,
-        )
+  const bestLoad = logs
+    .flatMap((log) => log.exercises)
+    .reduce(
+      (best, exercise) => (exercise.weightKg > best.value ? { id: exercise.templateId, value: exercise.weightKg } : best),
+      { id: '', value: 0 },
+    )
 
-      return { name: template.name, value: best }
-    })
-    .filter((item) => item.value > 0)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 3)
-
-  const bestPr = prs[0]
   const streakDates = logs
     .filter((log) => log.status === 'completed')
     .map((log) => dayjs(log.date).startOf('day').format('YYYY-MM-DD'))
@@ -84,19 +82,19 @@ export const Home = () => {
     cursor = cursor.subtract(1, 'day')
   }
 
-  const muscleCounts = MUSCLE_GROUPS.map((group) => ({
+  const focusCounts = MUSCLE_GROUPS.map((group) => ({
     group,
     count: currentWeekLogs.filter((log) => log.muscleGroups.includes(group)).length,
   }))
-  const maxMuscleCount = Math.max(...muscleCounts.map((item) => item.count), 1)
-  const weekDelta = weeklyVolume - previousWeeklyVolume
+  const maxFocusCount = Math.max(...focusCounts.map((item) => item.count), 1)
+  const weekDelta = totalLoad - previousTotalLoad
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 5 }, pb: 10 }}>
       <Stack spacing={3}>
         <AppHeader
-          title="Workout Dashboard"
-          subtitle={`${settings.displayName}, вот как выглядит ваша неделя по объёму, прогрессу силы и качеству плана.`}
+          title="kiks"
+          subtitle={`${settings.displayName}, вот как выглядит ваша неделя по столу, кисти, пронации и качеству отработки.`}
         />
 
         <Stack
@@ -107,27 +105,27 @@ export const Home = () => {
           }}
         >
           <StatCard
-            label="Тренировок за неделю"
-            value={String(currentWeekLogs.length)}
-            caption="Считаются только выполненные сессии"
-            icon={<FitnessCenterRoundedIcon color="primary" />}
+            label="Столовых сессий"
+            value={String(tableSessions)}
+            caption="Считаются выполненные тренировки с работой на столе"
+            icon={<SportsMmaRoundedIcon color="primary" />}
           />
           <StatCard
-            label="Общий тоннаж"
-            value={`${weeklyVolume.toLocaleString('ru-RU')} кг`}
-            caption="Сумма подходов × повторений × веса"
+            label="Нагрузка недели"
+            value={`${totalLoad.toLocaleString('ru-RU')} кг`}
+            caption="Сумма подходов, повторов и рабочей нагрузки"
             icon={<BarChartRoundedIcon color="primary" />}
           />
           <StatCard
-            label="Лучший PR"
-            value={bestPr ? `${bestPr.value.toFixed(0)} кг` : 'Нет данных'}
-            caption={bestPr ? bestPr.name : 'Появится после логов'}
+            label="Лучшая нагрузка"
+            value={bestLoad.value ? `${bestLoad.value.toFixed(0)} кг` : 'Нет данных'}
+            caption={bestLoad.id ? 'Лучший рабочий вес по движению' : 'Появится после первых логов'}
             icon={<EmojiEventsRoundedIcon color="primary" />}
           />
           <StatCard
             label="Текущий стрик"
             value={`${streak} дн.`}
-            caption="Подряд выполненные тренировочные дни"
+            caption="Подряд выполненные дни подготовки"
             icon={<BoltRoundedIcon color="primary" />}
           />
         </Stack>
@@ -143,31 +141,31 @@ export const Home = () => {
             <CardContent>
               <Stack spacing={2}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="h6">Прогрессия весов и сила</Typography>
+                  <Typography variant="h6">Прогрессия пронации</Typography>
                   <TrendingUpRoundedIcon color="primary" />
                 </Stack>
-                {benchHistory.length ? (
+                {pronationHistory.length ? (
                   <>
                     <Typography color="text.secondary">
-                      На жиме лёжа вы стали сильнее на {benchGrowthPercent.toFixed(1)}% по рабочему весу.
+                      В подъёме на пронацию вы выросли на {pronationGrowthPercent.toFixed(1)}% по рабочему весу.
                     </Typography>
                     <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                      {benchHistory.map((entry, index) => (
+                      {pronationHistory.map((entry, index) => (
                         <Chip
                           key={`${entry.date}-${index}`}
                           label={`${dayjs(entry.date).format('DD.MM')} · ${entry.weightKg} кг`}
-                          color={index === benchHistory.length - 1 ? 'primary' : 'default'}
+                          color={index === pronationHistory.length - 1 ? 'primary' : 'default'}
                         />
                       ))}
                     </Stack>
                     <Typography variant="body2" color="text.secondary">
-                      Расчёт роста силы строится по динамике рабочего веса в журнале и дополняется оценкой 1RM.
+                      Этот блок отражает, насколько уверенно растёт ваш ключевой armwrestling-паттерн.
                     </Typography>
                   </>
                 ) : (
                   <EmptyState
-                    title="Недостаточно данных для графика"
-                    description="Как только появятся несколько логов по одному упражнению, здесь отобразится рост силы."
+                    title="Недостаточно данных по пронации"
+                    description="Как только появятся несколько логов по подъёму на пронацию, здесь отобразится динамика."
                   />
                 )}
               </Stack>
@@ -186,11 +184,11 @@ export const Home = () => {
                   {weekDelta.toLocaleString('ru-RU')} кг
                 </Typography>
                 <Typography color="text.secondary">
-                  По сравнению с прошлой неделей вы {weekDelta >= 0 ? 'увеличили' : 'снизили'} объём на{' '}
+                  По сравнению с прошлой неделей вы {weekDelta >= 0 ? 'добавили' : 'снизили'} нагрузку на{' '}
                   {Math.abs(weekDelta).toLocaleString('ru-RU')} кг.
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Прошлая неделя: {previousWeeklyVolume.toLocaleString('ru-RU')} кг
+                  Прошлая неделя: {previousTotalLoad.toLocaleString('ru-RU')} кг
                 </Typography>
               </Stack>
             </CardContent>
@@ -207,17 +205,19 @@ export const Home = () => {
           <Card>
             <CardContent>
               <Stack spacing={2}>
-                <Typography variant="h6">Личные рекорды и 1RM</Typography>
-                {prs.length ? (
-                  prs.map((pr) => (
-                    <Stack key={pr.name} direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography>{pr.name}</Typography>
-                      <Chip label={`1RM ${pr.value.toFixed(0)} кг`} color="primary" />
-                    </Stack>
-                  ))
-                ) : (
-                  <Typography color="text.secondary">Личные рекорды появятся после первых заполненных тренировок.</Typography>
-                )}
+                <Typography variant="h6">План на текущую неделю</Typography>
+                <Typography variant="h4">{totalDrills}</Typography>
+                <Typography color="text.secondary">
+                  Моментов отработки уже привязано к выполненным дням этой недели.
+                </Typography>
+                {currentWeekPlans.slice(0, 3).map((day) => (
+                  <Stack key={day.id} spacing={0.5}>
+                    <Typography>{day.title}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {day.trainingPlan.matchFocusPoints.join(' · ')}
+                    </Typography>
+                  </Stack>
+                ))}
               </Stack>
             </CardContent>
           </Card>
@@ -225,8 +225,8 @@ export const Home = () => {
           <Card>
             <CardContent>
               <Stack spacing={2}>
-                <Typography variant="h6">Мышечная карта недели</Typography>
-                {muscleCounts.map((item) => (
+                <Typography variant="h6">Карта акцентов недели</Typography>
+                {focusCounts.map((item) => (
                   <Stack key={item.group} spacing={0.75}>
                     <Stack direction="row" justifyContent="space-between">
                       <Typography variant="body2">{item.group}</Typography>
@@ -236,7 +236,7 @@ export const Home = () => {
                     </Stack>
                     <LinearProgress
                       variant="determinate"
-                      value={(item.count / maxMuscleCount) * 100}
+                      value={(item.count / maxFocusCount) * 100}
                       sx={{ height: 8, borderRadius: 999 }}
                     />
                   </Stack>

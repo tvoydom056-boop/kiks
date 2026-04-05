@@ -103,13 +103,13 @@ export const Settings = () => {
           color="inherit"
           sx={{ alignSelf: 'flex-start' }}
         >
-          На дашборд
+          На главную
         </Button>
 
         <Stack spacing={0.75}>
-          <Typography variant="h4">Настройки</Typography>
+          <Typography variant="h4">Настройки kiks</Typography>
           <Typography color="text.secondary">
-            Персонализируйте дашборд, уведомления и общее поведение фитнес-трекера.
+            Персонализируйте дашборд, уведомления и общее поведение armwrestling-трекера.
           </Typography>
         </Stack>
 
@@ -151,7 +151,7 @@ export const Settings = () => {
           control={control}
           render={({ field }) => (
             <TimePicker
-              label="Предпочтительное время уведомлений"
+              label="Предпочтительное время напоминаний"
               value={field.value}
               onChange={(value) => field.onChange(value)}
               slotProps={{
@@ -183,7 +183,7 @@ export const Settings = () => {
 
         <FormControl>
           <Typography variant="subtitle2" gutterBottom>
-            Уведомления
+            Каналы уведомлений
           </Typography>
           <Controller
             name="notifications"
@@ -240,7 +240,7 @@ export const Settings = () => {
           render={({ field }) => (
             <FormControlLabel
               control={<Switch checked={field.value} onChange={(_, checked) => field.onChange(checked)} />}
-              label="Автосохранение данных"
+              label="Автосохранение планов и данных"
             />
           )}
         />

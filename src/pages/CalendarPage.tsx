@@ -30,8 +30,8 @@ export const CalendarPage = () => {
     <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 5 }, pb: 10 }}>
       <Stack spacing={3}>
         <AppHeader
-          title="Календарь"
-          subtitle="Здесь видно расписание тренировок, историю выполнения и текущий стрик по дням."
+          title="Календарь kiks"
+          subtitle="Здесь видно расписание столовых тренировок, историю выполнения и ближайшие дни под отработку."
         />
 
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -76,33 +76,59 @@ export const CalendarPage = () => {
                     return (
                       <Stack
                         key={dayKey}
-                        spacing={0.5}
                         sx={{
-                          minHeight: 96,
+                          minHeight: 108,
                           p: 1,
                           borderRadius: 3,
                           border: '1px solid',
                           borderColor: 'divider',
                           backgroundColor,
                           opacity: isCurrentMonth ? 1 : 0.45,
+                          minWidth: 0,
+                          overflow: 'hidden',
                         }}
                       >
-                        <Typography variant="body2">{date.format('D')}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {log?.title ?? plannedProgramDay?.programDay.title ?? 'Восстановление'}
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            lineHeight: 1,
+                            fontWeight: 700,
+                            minHeight: 18,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {date.format('D')}
                         </Typography>
-                        {log?.status ? (
-                          <Chip
-                            size="small"
-                            label={
-                              log.status === 'completed'
-                                ? 'Выполнено'
-                                : log.status === 'missed'
-                                  ? 'Пропуск'
-                                  : 'Запланировано'
-                            }
-                          />
-                        ) : null}
+                        <Stack spacing={0.5} sx={{ minWidth: 0, flex: 1, justifyContent: 'space-between' }}>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{
+                              lineHeight: 1.35,
+                              overflowWrap: 'anywhere',
+                              wordBreak: 'break-word',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 4,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {log?.title ?? plannedProgramDay?.programDay.title ?? 'Восстановление кисти'}
+                          </Typography>
+                          {log?.status ? (
+                            <Chip
+                              size="small"
+                              label={
+                                log.status === 'completed'
+                                  ? 'Выполнено'
+                                  : log.status === 'missed'
+                                    ? 'Пропуск'
+                                    : 'По плану'
+                              }
+                              sx={{ alignSelf: 'flex-start', maxWidth: '100%', flexShrink: 0 }}
+                            />
+                          ) : null}
+                        </Stack>
                       </Stack>
                     )
                   })}
@@ -120,15 +146,15 @@ export const CalendarPage = () => {
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <CheckCircleRoundedIcon color="success" />
-                  <Typography>Зелёные дни — тренировка выполнена</Typography>
+                  <Typography>Зелёные дни — столовая тренировка выполнена</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <RemoveCircleRoundedIcon color="disabled" />
-                  <Typography>Серые дни — тренировка пропущена</Typography>
+                  <Typography>Серые дни — подготовка пропущена</Typography>
                 </Stack>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <ScheduleRoundedIcon color="primary" />
-                  <Typography>Янтарные дни — тренировка запланирована</Typography>
+                  <Typography>Янтарные дни — по плану отработка или борьба</Typography>
                 </Stack>
 
                 <Typography variant="subtitle1" sx={{ pt: 1 }}>

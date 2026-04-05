@@ -1,6 +1,8 @@
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
+import EditRoundedIcon from '@mui/icons-material/EditRounded'
 import LibraryAddRoundedIcon from '@mui/icons-material/LibraryAddRounded'
-import MonitorWeightRoundedIcon from '@mui/icons-material/MonitorWeightRounded'
+import SportsMmaRoundedIcon from '@mui/icons-material/SportsMmaRounded'
 import {
   Button,
   Card,
@@ -8,6 +10,7 @@ import {
   Chip,
   Container,
   Fab,
+  IconButton,
   Stack,
   Typography,
 } from '@mui/material'
@@ -17,38 +20,50 @@ import { CreateExerciseDialog } from '../components/CreateExerciseDialog'
 import { CreateProgramDrawer } from '../components/CreateProgramDrawer'
 import { EmptyState } from '../components/EmptyState'
 import { ProgramCard } from '../components/ProgramCard'
-import { useNotesStore } from '../store/notes'
+import { useNotesStore, type ExerciseTemplate, type ExercisePrescription, type WorkoutProgram } from '../store/notes'
 
 export const PlannerPage = () => {
   const [programDrawerOpen, setProgramDrawerOpen] = useState(false)
   const [exerciseDialogOpen, setExerciseDialogOpen] = useState(false)
+  const [editingProgram, setEditingProgram] = useState<WorkoutProgram | null>(null)
+  const [editingTemplate, setEditingTemplate] = useState<ExerciseTemplate | null>(null)
+  const [editingPrescription, setEditingPrescription] = useState<ExercisePrescription | null>(null)
   const programs = useNotesStore((state) => state.programs)
   const templates = useNotesStore((state) => state.exerciseTemplates)
   const prescriptions = useNotesStore((state) => state.prescriptions)
+  const deleteProgram = useNotesStore((state) => state.deleteProgram)
+  const deleteExerciseTemplate = useNotesStore((state) => state.deleteExerciseTemplate)
 
   return (
     <>
       <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 5 }, pb: 10 }}>
         <Stack spacing={3}>
           <AppHeader
-            title="Планирование"
-            subtitle="Соберите недельные сплиты, храните библиотеку упражнений и заранее задавайте рабочие схемы."
+            title="План подготовки"
+            subtitle="Соберите циклы под армрестлинг, храните библиотеку движений и задавайте план на тренировку внутри каждого дня."
           />
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
             <Button
               variant="contained"
               startIcon={<AddRoundedIcon />}
-              onClick={() => setProgramDrawerOpen(true)}
+              onClick={() => {
+                setEditingProgram(null)
+                setProgramDrawerOpen(true)
+              }}
             >
-              Новая программа
+              Новый цикл
             </Button>
             <Button
               variant="outlined"
               startIcon={<LibraryAddRoundedIcon />}
-              onClick={() => setExerciseDialogOpen(true)}
+              onClick={() => {
+                setEditingTemplate(null)
+                setEditingPrescription(null)
+                setExerciseDialogOpen(true)
+              }}
             >
-              Добавить упражнение
+              Добавить движение
             </Button>
           </Stack>
 
@@ -61,14 +76,22 @@ export const PlannerPage = () => {
               }}
             >
               {programs.map((program) => (
-                <ProgramCard key={program.id} program={program} />
+                <ProgramCard
+                  key={program.id}
+                  program={program}
+                  onEdit={(currentProgram) => {
+                    setEditingProgram(currentProgram)
+                    setProgramDrawerOpen(true)
+                  }}
+                  onDelete={(currentProgram) => deleteProgram(currentProgram.id)}
+                />
               ))}
             </Stack>
           ) : (
             <EmptyState
-              title="Программ пока нет"
-              description="Создайте недельный или месячный план, чтобы календарь и аналитика начали работать как система."
-              actionLabel="Создать программу"
+              title="Циклов пока нет"
+              description="Создайте первый план подготовки, чтобы календарь, дашборд и деталка программы начали работать как единая система."
+              actionLabel="Создать цикл"
               onAction={() => setProgramDrawerOpen(true)}
             />
           )}
@@ -77,8 +100,8 @@ export const PlannerPage = () => {
             <CardContent>
               <Stack spacing={2}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="h6">Библиотека упражнений</Typography>
-                  <MonitorWeightRoundedIcon color="primary" />
+                  <Typography variant="h6">Библиотека движений</Typography>
+                  <SportsMmaRoundedIcon color="primary" />
                 </Stack>
                 {templates.map((template) => {
                   const prescription = prescriptions.find((item) => item.templateId === template.id)
@@ -98,11 +121,28 @@ export const PlannerPage = () => {
                           <Chip size="small" variant="outlined" label={template.equipment} />
                         </Stack>
                       </Stack>
-                      <Typography color="text.secondary">
-                        {prescription
-                          ? `${prescription.sets}×${prescription.reps} · ${prescription.weightKg} кг · отдых ${prescription.restSec} сек`
-                          : 'Схема ещё не задана'}
-                      </Typography>
+                      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+                        <Typography color="text.secondary">
+                          {prescription
+                            ? `${prescription.sets}×${prescription.reps} · ${prescription.weightKg} кг · отдых ${prescription.restSec} сек`
+                            : 'Схема ещё не задана'}
+                        </Typography>
+                        <Stack direction="row" spacing={0.5}>
+                          <IconButton
+                            size="small"
+                            onClick={() => {
+                              setEditingTemplate(template)
+                              setEditingPrescription(prescription ?? null)
+                              setExerciseDialogOpen(true)
+                            }}
+                          >
+                            <EditRoundedIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" onClick={() => deleteExerciseTemplate(template.id)}>
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </Stack>
                     </Stack>
                   )
                 })}
@@ -114,15 +154,34 @@ export const PlannerPage = () => {
 
       <Fab
         color="primary"
-        aria-label="Создать программу"
-        onClick={() => setProgramDrawerOpen(true)}
+        aria-label="Создать цикл"
+        onClick={() => {
+          setEditingProgram(null)
+          setProgramDrawerOpen(true)
+        }}
         sx={{ position: 'fixed', right: 24, bottom: 24 }}
       >
         <AddRoundedIcon />
       </Fab>
 
-      <CreateProgramDrawer open={programDrawerOpen} onClose={() => setProgramDrawerOpen(false)} />
-      <CreateExerciseDialog open={exerciseDialogOpen} onClose={() => setExerciseDialogOpen(false)} />
+      <CreateProgramDrawer
+        open={programDrawerOpen}
+        onClose={() => {
+          setProgramDrawerOpen(false)
+          setEditingProgram(null)
+        }}
+        initialProgram={editingProgram}
+      />
+      <CreateExerciseDialog
+        open={exerciseDialogOpen}
+        onClose={() => {
+          setExerciseDialogOpen(false)
+          setEditingTemplate(null)
+          setEditingPrescription(null)
+        }}
+        initialTemplate={editingTemplate}
+        initialPrescription={editingPrescription}
+      />
     </>
   )
 }
